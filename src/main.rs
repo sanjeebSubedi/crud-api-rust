@@ -5,30 +5,29 @@ use axum::{
     routing::{get, post},
     Extension, Router,
 };
+use dotenv::dotenv;
 use handlers::{
-    book::{add_book, get_all_books},
+    book::{create_book, get_all_books},
     user::create_user,
 };
+use std::env;
 use std::error::Error;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let db = database::connect::connect().await?;
-    // sqlx::migrate!("./migrations").run(&db).await?;
+    dotenv().ok();
+    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL not found in .env");
+    let db = sqlx::postgres::PgPool::connect(&database_url).await?;
+    sqlx::migrate!("./migrations").run(&db).await?;
     let app: Router = Router::new()
-        .route("/", get(landing_page_handler))
         .route("/books", get(get_all_books))
-        .route("/books", post(add_book))
+        .route("/books", post(create_book))
         .route("/users", post(create_user))
-        .layer(Extension(db.clone()));
+        .layer(Extension(db));
 
     axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
         .serve(app.into_make_service())
         .await
         .unwrap();
     Ok(())
-}
-
-async fn landing_page_handler() -> String {
-    "Hello everyone".to_owned()
 }
