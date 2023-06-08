@@ -1,9 +1,15 @@
-use axum::Json;
+use axum::{Extension, Json};
 use sqlx::PgPool;
 use validator::Validate;
 
-use crate::models::user::{CreateUser, CreateUserResponse, CreateUserResponseData};
-use bcrypt::{hash, DEFAULT_COST};
+use crate::{
+    models::user::User,
+    schemas::user::{
+        CreateUser, CreateUserResponse, CreateUserResponseData, LoginResponse, LoginResponseData,
+        LoginUser,
+    },
+};
+use bcrypt::{hash, verify, DEFAULT_COST};
 
 pub fn return_response(status: &str, message: &str) -> Json<CreateUserResponse> {
     Json(CreateUserResponse {
@@ -40,4 +46,42 @@ pub async fn create_user(
     } else {
         return_response("Success", "New user was successfully created!")
     }
+}
+
+pub fn login_response(status: &str, message: &str) -> Json<LoginResponse> {
+    Json(LoginResponse {
+        status: status.to_owned(),
+        data: LoginResponseData {
+            message: message.to_owned(),
+        },
+    })
+}
+
+pub async fn user_login(
+    pool: Extension<PgPool>,
+    Json(credentials): Json<LoginUser>,
+) -> Json<LoginResponse> {
+    if credentials.validate().is_err() {
+        return login_response("Failed!", "Validation failed!");
+    }
+    let query = "SELECT * FROM users WHERE email = $1";
+    let res = sqlx::query_as::<_, User>(query)
+        .bind(credentials.email)
+        .fetch_optional(&*pool)
+        .await;
+
+    let (status, message) = match res {
+        Ok(Some(data)) => {
+            let valid = verify(&credentials.password, &data.password);
+            match valid {
+                Ok(true) => ("Success", "Login Successful"),
+                Ok(false) => ("Failed", "Incorrect Password"),
+                Err(_) => ("Failed", "Password verification error!"),
+            }
+        }
+        Ok(None) => ("Failed", "Email not found!"),
+        Err(_) => ("Failed", "Failed to connect to the database!"),
+    };
+
+    login_response(status, message)
 }
