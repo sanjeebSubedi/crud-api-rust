@@ -1,7 +1,25 @@
-use crate::models::book::{BookCreate, BookCreateData, BookCreateResponse, BookGet};
-
+use crate::schemas::book::{BookCreate, BookCreateResponse, BookCreateResponseData, BookGet};
 use axum::{Extension, Json};
+use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct OwnerId {
+    pub owner_id: i32,
+}
+
+pub async fn get_books_by_user(
+    pool: Extension<PgPool>,
+    Json(data): Json<OwnerId>,
+) -> Json<Vec<BookGet>> {
+    let query = "SELECT title, author, owner_id from books where owner_id = $1";
+    let books = sqlx::query_as::<_, BookGet>(query)
+        .bind(data.owner_id)
+        .fetch_all(&*pool)
+        .await
+        .expect("Failed to fetch books from the database");
+    Json(books)
+}
 
 pub async fn get_all_books(pool: Extension<PgPool>) -> Json<Vec<BookGet>> {
     let query = "SELECT title, author, owner_id FROM books";
@@ -32,7 +50,7 @@ pub async fn create_book(
 
     let response = BookCreateResponse {
         status: status.to_owned(),
-        data: BookCreateData {
+        data: BookCreateResponseData {
             message: message.to_owned(),
         },
     };
