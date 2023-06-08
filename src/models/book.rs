@@ -1,11 +1,12 @@
 use serde::{Deserialize, Serialize};
+use sqlx::FromRow;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Book {
-    // pub id: u32,
+    pub id: u32,
     pub title: String,
     pub author: String,
-    // pub owner_id: u32,
+    pub owner_id: u32,
     // publication_year: u32,
     // description: String,
     // genre: String,
@@ -14,19 +15,26 @@ pub struct Book {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct BookAdd {
+pub struct BookCreate {
+    pub title: String,
+    pub author: String,
+    pub owner_id: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize, FromRow)]
+pub struct BookGet {
     pub title: String,
     pub author: String,
     pub owner_id: i64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct BookAddData {
+pub struct BookCreateData {
     pub message: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct BookAddResponse {
+pub struct BookCreateResponse {
     pub status: String,
-    pub data: BookAddData,
+    pub data: BookCreateData,
 }
