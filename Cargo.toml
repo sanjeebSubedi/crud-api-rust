@@ -7,6 +7,9 @@ edition = "2021"
 
 [dependencies]
 axum = "0.6.18"
+bcrypt = "0.14.0"
+dotenv = "0.15.0"
 serde = { version = "1.0.163", features = ["derive"] }
 sqlx = { version = "0.6.3", features = ["runtime-tokio-rustls", "postgres"] }
 tokio = { version = "1.28.2", features = ["macros", "rt-multi-thread"] }
+validator = { version = "0.16.0", features = ["derive"] }
