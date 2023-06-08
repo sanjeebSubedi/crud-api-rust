@@ -1,31 +1,12 @@
 use serde::{Deserialize, Serialize};
-use validator::Validate;
+use sqlx::FromRow;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, FromRow, Debug)]
 pub struct User {
-    id: u32,
+    id: i64,
     email: String,
-    password: String,
+    pub password: String,
     name: String,
     // address: String,
     // phone_number: String,
-}
-
-#[derive(Serialize, Deserialize, Validate)]
-pub struct CreateUser {
-    #[validate(email)]
-    pub email: String,
-    pub password: String,
-    pub name: String,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct CreateUserResponseData {
-    pub message: String,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct CreateUserResponse {
-    pub status: String,
-    pub data: CreateUserResponseData,
 }
