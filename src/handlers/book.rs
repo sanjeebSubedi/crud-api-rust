@@ -1,5 +1,5 @@
 use crate::schemas::book::{BookCreate, BookCreateResponse, BookCreateResponseData, BookGet};
-use axum::{Extension, Json};
+use axum::{http::StatusCode, Extension, Json};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 
@@ -11,30 +11,30 @@ pub struct OwnerId {
 pub async fn get_books_by_user(
     pool: Extension<PgPool>,
     Json(data): Json<OwnerId>,
-) -> Json<Vec<BookGet>> {
+) -> (StatusCode, Json<Vec<BookGet>>) {
     let query = "SELECT title, author, owner_id from books where owner_id = $1";
-    let books = sqlx::query_as::<_, BookGet>(query)
+    match sqlx::query_as::<_, BookGet>(query)
         .bind(data.owner_id)
         .fetch_all(&*pool)
         .await
-        .expect("Failed to fetch books from the database");
-    Json(books)
+    {
+        Ok(books) => (StatusCode::OK, Json(books)),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(vec![])),
+    }
 }
 
-pub async fn get_all_books(pool: Extension<PgPool>) -> Json<Vec<BookGet>> {
+pub async fn get_all_books(pool: Extension<PgPool>) -> (StatusCode, Json<Vec<BookGet>>) {
     let query = "SELECT title, author, owner_id FROM books";
-    let books = sqlx::query_as::<_, BookGet>(query)
-        .fetch_all(&*pool)
-        .await
-        .expect("Failed to fetch books from the database");
-
-    Json(books)
+    match sqlx::query_as::<_, BookGet>(query).fetch_all(&*pool).await {
+        Ok(books) => (StatusCode::OK, Json(books)),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(vec![])),
+    }
 }
 
 pub async fn create_book(
     pool: Extension<PgPool>,
     Json(book): Json<BookCreate>,
-) -> Json<BookCreateResponse> {
+) -> (StatusCode, Json<BookCreateResponse>) {
     let query = "INSERT INTO books(title, author, owner_id) VALUES ($1, $2, $3)";
     let res = sqlx::query(query)
         .bind(&book.title)
@@ -43,9 +43,17 @@ pub async fn create_book(
         .execute(&*pool)
         .await;
 
-    let (status, message) = match res {
-        Ok(_) => ("Success", "Book successfully added to the store!"),
-        Err(_) => ("Failed", "Failed to add book to the store!"),
+    let (status_code, status, message) = match res {
+        Ok(_) => (
+            StatusCode::OK,
+            "Success",
+            "Book successfully added to the store!",
+        ),
+        Err(_) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Failed",
+            "Failed to add book to the store!",
+        ),
     };
 
     let response = BookCreateResponse {
@@ -55,5 +63,5 @@ pub async fn create_book(
         },
     };
 
-    Json(response)
+    (status_code, Json(response))
 }
