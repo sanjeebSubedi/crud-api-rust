@@ -1,3 +1,4 @@
+use super::jwt_handler::sign_jwt;
 use crate::{
     models::user::User,
     schemas::user::{
@@ -11,11 +12,11 @@ use bcrypt::{hash, verify, DEFAULT_COST};
 use sqlx::PgPool;
 use validator::Validate;
 
-pub fn return_response(status: &str, message: &str) -> Json<CreateUserResponse> {
+pub fn return_response(status: &str, access_token: &str) -> Json<CreateUserResponse> {
     Json(CreateUserResponse {
         status: status.to_owned(),
         data: CreateUserResponseData {
-            message: message.to_owned(),
+            access_token: access_token.to_owned(),
         },
     })
 }
@@ -54,19 +55,21 @@ pub async fn create_user(
             StatusCode::BAD_REQUEST,
             return_response("Failed", "Failed to create new user"),
         )
+    } else if let Ok(token) = sign_jwt(&user.email).await {
+        (StatusCode::OK, return_response("Success", &token))
     } else {
         (
-            StatusCode::OK,
-            return_response("Success", "New user was successfully created!"),
+            StatusCode::BAD_REQUEST,
+            return_response("Failed", "Failed to create new user"),
         )
     }
 }
 
-pub fn login_response(status: &str, message: &str) -> Json<LoginResponse> {
+pub fn login_response(status: &str, access_token: &str) -> Json<LoginResponse> {
     Json(LoginResponse {
         status: status.to_owned(),
         data: LoginResponseData {
-            message: message.to_owned(),
+            access_token: access_token.to_owned(),
         },
     })
 }
@@ -83,7 +86,7 @@ pub async fn user_login(
     }
     let query = "SELECT * FROM users WHERE email = $1";
     let res = sqlx::query_as::<_, User>(query)
-        .bind(credentials.email)
+        .bind(&credentials.email)
         .fetch_optional(&*pool)
         .await;
 
@@ -107,6 +110,10 @@ pub async fn user_login(
             "Failed to connect to the database!",
         ),
     };
-
+    if status_code == StatusCode::OK {
+        if let Ok(token) = sign_jwt(&credentials.email).await {
+            return (status_code, login_response(status, &token));
+        }
+    }
     (status_code, login_response(status, message))
 }
