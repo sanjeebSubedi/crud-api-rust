@@ -1,9 +1,9 @@
-use crate::schemas::book::{BookCreate, BookCreateResponse, BookCreateResponseData, BookGet};
-use axum::{http::StatusCode, Extension, Json};
-use serde::{Deserialize, Serialize};
+use crate::schemas::book::{BookCreate, BookGet};
+use axum::{http::StatusCode, response::IntoResponse, Extension, Json};
+use serde::Deserialize;
 use sqlx::PgPool;
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize)]
 pub struct OwnerId {
     pub owner_id: i32,
 }
@@ -11,30 +11,48 @@ pub struct OwnerId {
 pub async fn get_books_by_user(
     pool: Extension<PgPool>,
     Json(data): Json<OwnerId>,
-) -> (StatusCode, Json<Vec<BookGet>>) {
+) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
     let query = "SELECT title, author, owner_id from books where owner_id = $1";
     match sqlx::query_as::<_, BookGet>(query)
         .bind(data.owner_id)
         .fetch_all(&*pool)
         .await
     {
-        Ok(books) => (StatusCode::OK, Json(books)),
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(vec![])),
+        Ok(books) => Ok((
+            StatusCode::OK,
+            Json(serde_json::json!({"status": "success", "data": books})),
+        )),
+        Err(_) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(
+                serde_json::json!({"status": "failed", "message": "Error while connecting to the database!"}),
+            ),
+        )),
     }
 }
 
-pub async fn get_all_books(pool: Extension<PgPool>) -> (StatusCode, Json<Vec<BookGet>>) {
+pub async fn get_all_books(
+    pool: Extension<PgPool>,
+) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
     let query = "SELECT title, author, owner_id FROM books";
     match sqlx::query_as::<_, BookGet>(query).fetch_all(&*pool).await {
-        Ok(books) => (StatusCode::OK, Json(books)),
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(vec![])),
+        Ok(books) => Ok((
+            StatusCode::OK,
+            Json(serde_json::json!({"status": "success", "data": books})),
+        )),
+        Err(_) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(
+                serde_json::json!({"status": "failed", "message": "Error while connecting to the database!"}),
+            ),
+        )),
     }
 }
 
 pub async fn create_book(
     pool: Extension<PgPool>,
     Json(book): Json<BookCreate>,
-) -> (StatusCode, Json<BookCreateResponse>) {
+) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
     let query = "INSERT INTO books(title, author, owner_id) VALUES ($1, $2, $3)";
     let res = sqlx::query(query)
         .bind(&book.title)
@@ -43,25 +61,18 @@ pub async fn create_book(
         .execute(&*pool)
         .await;
 
-    let (status_code, status, message) = match res {
-        Ok(_) => (
+    match res {
+        Ok(_) => Ok((
             StatusCode::OK,
-            "Success",
-            "Book successfully added to the store!",
-        ),
-        Err(_) => (
+            Json(
+                serde_json::json!({"status": "success", "message": "Book successfully added to the store."}),
+            ),
+        )),
+        Err(_) => Err((
             StatusCode::INTERNAL_SERVER_ERROR,
-            "Failed",
-            "Failed to add book to the store!",
-        ),
-    };
-
-    let response = BookCreateResponse {
-        status: status.to_owned(),
-        data: BookCreateResponseData {
-            message: message.to_owned(),
-        },
-    };
-
-    (status_code, Json(response))
+            Json(
+                serde_json::json!({"status": "failed", "message": "Failed to add book to the store"}),
+            ),
+        )),
+    }
 }
