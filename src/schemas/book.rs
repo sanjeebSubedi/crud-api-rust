@@ -14,14 +14,3 @@ pub struct BookGet {
     pub author: String,
     pub owner_id: i64,
 }
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct BookCreateResponseData {
-    pub message: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct BookCreateResponse {
-    pub status: String,
-    pub data: BookCreateResponseData,
-}
